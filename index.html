@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>המשחק של נגה המלכה - גרסה משודרגת</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        #game-container {
+            background: white;
+            padding: 30px;
+            border-radius: 25px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            text-align: center;
+            max-width: 550px;
+            width: 90%;
+            border: 5px solid #ff4081;
+            position: relative;
+        }
+        h1 { color: #ad1457; margin-bottom: 10px; font-size: 28px; }
+        h2 { color: #ec407a; font-weight: normal; margin-bottom: 20px; }
+        input[type="text"] {
+            padding: 12px;
+            width: 80%;
+            border-radius: 10px;
+            border: 2px solid #ff4081;
+            font-size: 18px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .btn {
+            background: #ff4081;
+            color: white;
+            border: none;
+            padding: 15px 45px;
+            font-size: 24px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255, 64, 129, 0.4);
+        }
+        .btn:hover { background: #f50057; transform: scale(1.1); }
+        .option-btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            margin: 12px 0;
+            background: #fff;
+            border: 2px solid #f0f0f0;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 19px;
+            transition: 0.2s;
+        }
+        .option-btn:hover { background: #fce4ec; border-color: #ff4081; transform: translateY(-3px); }
+        #question-text { font-size: 24px; color: #333; margin-bottom: 25px; font-weight: bold; }
+        .hidden { display: none; }
+        .leaderboard {
+            margin-top: 20px;
+            text-align: right;
+            background: #fff5f8;
+            padding: 15px;
+            border-radius: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dashed #ff80ab;
+            padding: 5px 0;
+        }
+    </style>
+</head>
+<body>
+
+<audio id="bgMusic" loop>
+    <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" type="audio/mpeg">
+</audio>
+
+<div id="game-container">
+    <div id="start-screen">
+        <h1>בואו לשחק במשחק של נגה המלכה!</h1>
+        <h2>של מי מכיר אותה הכי טוב?</h2>
+        <input type="text" id="playerName" placeholder="הכניסו שם מלא כדי להתחיל...">
+        <br>
+        <button class="btn" onclick="startGame()">ענתר</button>
+    </div>
+
+    <div id="quiz-screen" class="hidden">
+        <span id="question-number" style="color:#ff4081; font-weight:bold;"></span>
+        <div id="question-text"></div>
+        <div id="options-container"></div>
+    </div>
+
+    <div id="end-screen" class="hidden">
+        <h1>המשחק נגמר!</h1>
+        <div id="score-display" style="font-size:30px; color:#ad1457; font-weight:bold;"></div>
+        <p id="feedback-text"></p>
+        
+        <h3>טבלת שיאים - מומחי נגה:</h3>
+        <div id="leaderboard" class="leaderboard"></div>
+        
+        <button class="btn" style="margin-top:20px;" onclick="location.reload()">שחקן חדש</button>
+    </div>
+</div>
+
+<script>
+    const allQuestions = [
+        { q: "מה המאכל שנגה בחיים לא תסכים לאכול?", a: ["מלפפון חמוץ", "טחינה", "חסה", "ביצת עין"], correct: 1 },
+        { q: "מה נגה הכי אוהבת לעשות?", a: ["להיות דבוקה למחשב", "לאפות", "לרקוד", "לרדוף אחרי ממתקים"], correct: 3 },
+        { q: "מהו משפט המפתח של נגה?", a: ["עוד חמש דקות", "רגע", "שנייה", "טוב"], correct: 0 },
+        { q: "מהו יעד החופשה המועדף על נגה?", a: ["אוסטריה", "אילת", "מונטנגרו", "תאילנד"], correct: 2 },
+        { q: "איזו סדרה/דמות נגה הכי אוהבת?", a: ["שקשוקה", "נמו", "בת הים הקטנה", "כראמל"], correct: 3 },
+        { q: "מהו המקצוע הכי אהוב על נגה בבית הספר?", a: ["מחשבים", "כדורסל", "אומנות", "אנגלית"], correct: 1 },
+        { q: "איזה מהכינויים הבאים הוא הכינוי של נגה?", a: ["פיקה", "פרמזנית", "מיקה", "איש גדול"], correct: 2 },
+        { q: "איזה צבע נגה הכי אוהבת?", a: ["לבן", "שחור", "זהב", "ורוד"], correct: 3 },
+        { q: "מה הדבר הראשון שנגה עושה בבוקר?", a: ["לצחצח שיניים", "לפתוח טלפון", "להתארגן לביס", "לעשות שיעורים"], correct: 1 },
+        { q: "איזה סרט נגה ראתה הכי הרבה פעמים?", a: ["סינדרלה", "מואנה", "נמו", "מולאן"], correct: 2 },
+        { q: "מה נגה הכי אוהבת לעשות ביום ההולדת שלה?", a: ["להכין לעצמה עוגה", "לקבל מתנות", "לצלם סרטונים", "לאכול ממתקים"], correct: 0 },
+        { q: "מה המקצוע שנגה הכי פחות אוהבת בבית הספר?", a: ["אנגלית", "מדעים", "מתמטיקה", "שפה"], correct: 1 },
+        { q: "אם נגה הייתה גיבורת על, מי היא הייתה?", a: ["מולאן", "רפונזל", "נמו", "מואנה"], correct: 3 }
+    ];
+
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let playerName = "";
+
+    function startGame() {
+        playerName = document.getElementById('playerName').value;
+        if (!playerName) {
+            alert("בבקשה תכניסו שם כדי שנגה תדע מי אתם!");
+            return;
+        }
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('quiz-screen').classList.remove('hidden');
+        document.getElementById('bgMusic').play(); // התחלת מוזיקה
+        showQuestion();
+    }
+
+    function showQuestion() {
+        const q = allQuestions[currentQuestionIndex];
+        document.getElementById('question-number').innerText = `שאלה ${currentQuestionIndex + 1} מתוך ${allQuestions.length}`;
+        document.getElementById('question-text').innerText = q.q;
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+
+        q.a.forEach((option, index) => {
+            const button = document.createElement('button');
+            button.innerText = option;
+            button.className = 'option-btn';
+            button.onclick = () => checkAnswer(index);
+            container.appendChild(button);
+        });
+    }
+
+    function checkAnswer(selectedIndex) {
+        if (selectedIndex === allQuestions[currentQuestionIndex].correct) {
+            score++;
+        }
+
+        currentQuestionIndex++;
+        if (currentQuestionIndex < allQuestions.length) {
+            showQuestion();
+        } else {
+            showEndScreen();
+        }
+    }
+
+    function showEndScreen() {
+        document.getElementById('quiz-screen').classList.add('hidden');
+        document.getElementById('end-screen').classList.remove('hidden');
+        document.getElementById('score-display').innerText = `${score} מתוך ${allQuestions.length}`;
+        
+        // שמירת תוצאה בטבלה (Local Storage)
+        let highScores = JSON.parse(localStorage.getItem('nogaScores')) || [];
+        highScores.push({name: playerName, score: score});
+        highScores.sort((a, b) => b.score - a.score); // מיון מהגבוה לנמוך
+        localStorage.setItem('nogaScores', JSON.stringify(highScores));
+
+        displayLeaderboard();
+    }
+
+    function displayLeaderboard() {
+        const container = document.getElementById('leaderboard');
+        const highScores = JSON.parse(localStorage.getItem('nogaScores')) || [];
+        container.innerHTML = highScores.map(item => 
+            `<div class="leaderboard-item"><span>${item.name}</span><span>${item.score} נק'</span></div>`
+        ).join('');
+    }
+</script>
+
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>המשחק של נגה המלכה - גרסת הענן</title>
+    <title>המשחק של נגה המלכה - גרסת הענן הסופית</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -85,7 +85,7 @@
             border-bottom: 1px dashed #ff80ab;
             padding: 8px 0;
         }
-        .loading-text { color: #ad1457; font-style: italic; }
+        .status-msg { margin-top: 10px; font-weight: bold; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -114,7 +114,7 @@
     <div id="end-screen" class="hidden">
         <h1>המשחק נגמר!</h1>
         <div id="score-display" style="font-size:30px; color:#ad1457; font-weight:bold;"></div>
-        <p id="status-message" class="loading-text">שומר תוצאה בענן...</p>
+        <div id="status-message" class="status-msg" style="color: #ad1457;">שומר תוצאה בענן...</div>
         
         <h3>טבלת שיאים עולמית:</h3>
         <div id="leaderboard" class="leaderboard">טוען נתונים...</div>
@@ -124,7 +124,7 @@
 </div>
 
 <script>
-    // הכתובת מה-Sheety שלכם
+    // ה-URL המדויק מהצילום מסך שלכם
     const API_URL = 'https://api.sheety.co/5fc967afdd7d19b6e99e510bb8e7e25c/noga/noga';
 
     const allQuestions = [
@@ -150,12 +150,12 @@
     function startGame() {
         playerName = document.getElementById('playerName').value;
         if (!playerName) {
-            alert("בבקשה תכניסו שם!");
+            alert("בבקשה הכניסו שם!");
             return;
         }
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('quiz-screen').classList.remove('hidden');
-        document.getElementById('bgMusic').play().catch(e => console.log("Music blocked by browser"));
+        document.getElementById('bgMusic').play().catch(() => {});
         showQuestion();
     }
 
@@ -173,7 +173,6 @@
         document.getElementById('question-text').innerText = q.q;
         const container = document.getElementById('options-container');
         container.innerHTML = '';
-
         q.a.forEach((option, index) => {
             const button = document.createElement('button');
             button.innerText = option;
@@ -184,15 +183,10 @@
     }
 
     function checkAnswer(selectedIndex) {
-        if (selectedIndex === allQuestions[currentQuestionIndex].correct) {
-            score++;
-        }
+        if (selectedIndex === allQuestions[currentQuestionIndex].correct) score++;
         currentQuestionIndex++;
-        if (currentQuestionIndex < allQuestions.length) {
-            showQuestion();
-        } else {
-            showEndScreen();
-        }
+        if (currentQuestionIndex < allQuestions.length) showQuestion();
+        else showEndScreen();
     }
 
     async function showEndScreen() {
@@ -200,15 +194,14 @@
         document.getElementById('end-screen').classList.remove('hidden');
         document.getElementById('score-display').innerText = `${score} מתוך ${allQuestions.length}`;
         
-        // שליחה לענן
         await sendScoreToCloud(playerName, score);
-        // טעינת הלוח המעודכן
         fetchAndDisplayLeaderboard();
     }
 
     async function sendScoreToCloud(name, finalScore) {
+        // חשוב: השם 'noga' חייב להתאים לשם הגיליון ב-Sheety
         const body = {
-            noga: { // השם של הגיליון בטבלה
+            noga: { 
                 name: name,
                 score: finalScore
             }
@@ -220,11 +213,15 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            if(response.ok) {
-                document.getElementById('status-message').innerText = "התוצאה נשמרה בהצלחה!";
+            if (response.ok) {
+                document.getElementById('status-message').innerText = "✅ נשמר בלוח השיאים!";
+                document.getElementById('status-message').style.color = "green";
+            } else {
+                document.getElementById('status-message').innerText = "❌ שגיאה בשמירה (בדקו POST ב-Sheety)";
+                document.getElementById('status-message').style.color = "red";
             }
         } catch (error) {
-            document.getElementById('status-message').innerText = "שגיאה בשמירה לענן.";
+            document.getElementById('status-message').innerText = "❌ תקלת תקשורת";
         }
     }
 
@@ -233,27 +230,26 @@
         try {
             const response = await fetch(API_URL);
             const data = await response.json();
-            let scores = data.noga || [];
+            // מוודא שאנחנו מושכים את המערך הנכון (noga או nogas לפי ה-API)
+            let scores = data.noga || data.nogas || [];
 
-            // מיון מהציון הגבוה לנמוך
             scores.sort((a, b) => b.score - a.score);
 
-            if(scores.length === 0) {
-                container.innerHTML = "אין עדיין תוצאות. תהיו הראשונים!";
+            if (scores.length === 0) {
+                container.innerHTML = "אין תוצאות עדיין.";
                 return;
             }
 
-            container.innerHTML = scores.map((item, index) => `
+            container.innerHTML = scores.slice(0, 10).map((item, index) => `
                 <div class="leaderboard-item">
-                    <span>${index + 1}. ${item.name}</span>
-                    <span style="font-weight:bold;">${item.score} נק'</span>
+                    <span>${index + 1}. ${item.name || 'אנונימי'}</span>
+                    <span>${item.score} נק'</span>
                 </div>
             `).join('');
         } catch (error) {
-            container.innerHTML = "לא הצלחנו לטעון את לוח התוצאות.";
+            container.innerHTML = "שגיאה בטעינת הלוח.";
         }
     }
 </script>
-
 </body>
 </html>

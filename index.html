@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>המשחק של נגה המלכה - גרסה משודרגת</title>
+    <title>המשחק של נגה המלכה - גרסת הענן</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -47,8 +47,14 @@
             transition: 0.3s;
             font-weight: bold;
             box-shadow: 0 4px 15px rgba(255, 64, 129, 0.4);
+            margin: 10px 5px;
         }
-        .btn:hover { background: #f50057; transform: scale(1.1); }
+        .btn:hover { background: #f50057; transform: scale(1.05); }
+        .btn-secondary {
+            background: #ad1457;
+            font-size: 16px;
+            padding: 10px 20px;
+        }
         .option-btn {
             display: block;
             width: 100%;
@@ -70,15 +76,16 @@
             background: #fff5f8;
             padding: 15px;
             border-radius: 15px;
-            max-height: 200px;
+            max-height: 250px;
             overflow-y: auto;
         }
         .leaderboard-item {
             display: flex;
             justify-content: space-between;
             border-bottom: 1px dashed #ff80ab;
-            padding: 5px 0;
+            padding: 8px 0;
         }
+        .loading-text { color: #ad1457; font-style: italic; }
     </style>
 </head>
 <body>
@@ -93,7 +100,9 @@
         <h2>של מי מכיר אותה הכי טוב?</h2>
         <input type="text" id="playerName" placeholder="הכניסו שם מלא כדי להתחיל...">
         <br>
-        <button class="btn" onclick="startGame()">הכנס</button>
+        <button class="btn" onclick="startGame()">אישור</button>
+        <br>
+        <button class="btn btn-secondary" onclick="showOnlyLeaderboard()">🏆 לוח התוצאות</button>
     </div>
 
     <div id="quiz-screen" class="hidden">
@@ -105,16 +114,19 @@
     <div id="end-screen" class="hidden">
         <h1>המשחק נגמר!</h1>
         <div id="score-display" style="font-size:30px; color:#ad1457; font-weight:bold;"></div>
-        <p id="feedback-text"></p>
+        <p id="status-message" class="loading-text">שומר תוצאה בענן...</p>
         
-        <h3>טבלת שיאים - מומחי נגה:</h3>
-        <div id="leaderboard" class="leaderboard"></div>
+        <h3>טבלת שיאים עולמית:</h3>
+        <div id="leaderboard" class="leaderboard">טוען נתונים...</div>
         
-        <button class="btn" style="margin-top:20px;" onclick="location.reload()">שחקן חדש</button>
+        <button class="btn btn-secondary" onclick="location.reload()">שחקן חדש</button>
     </div>
 </div>
 
 <script>
+    // הכתובת מה-Sheety שלכם
+    const API_URL = 'https://api.sheety.co/5fc967afdd7d19b6e99e510bb8e7e25c/noga/noga';
+
     const allQuestions = [
         { q: "מה המאכל שנגה בחיים לא תסכים לאכול?", a: ["מלפפון חמוץ", "טחינה", "חסה", "ביצת עין"], correct: 1 },
         { q: "מה נגה הכי אוהבת לעשות?", a: ["להיות דבוקה למחשב", "לאפות", "לרקוד", "לרדוף אחרי ממתקים"], correct: 3 },
@@ -138,13 +150,21 @@
     function startGame() {
         playerName = document.getElementById('playerName').value;
         if (!playerName) {
-            alert("בבקשה תכניסו שם כדי שנגה תדע מי אתם!");
+            alert("בבקשה תכניסו שם!");
             return;
         }
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('quiz-screen').classList.remove('hidden');
-        document.getElementById('bgMusic').play(); // התחלת מוזיקה
+        document.getElementById('bgMusic').play().catch(e => console.log("Music blocked by browser"));
         showQuestion();
+    }
+
+    function showOnlyLeaderboard() {
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('end-screen').classList.remove('hidden');
+        document.getElementById('score-display').innerText = "לוח תוצאות";
+        document.getElementById('status-message').innerText = "";
+        fetchAndDisplayLeaderboard();
     }
 
     function showQuestion() {
@@ -167,7 +187,6 @@
         if (selectedIndex === allQuestions[currentQuestionIndex].correct) {
             score++;
         }
-
         currentQuestionIndex++;
         if (currentQuestionIndex < allQuestions.length) {
             showQuestion();
@@ -176,26 +195,63 @@
         }
     }
 
-    function showEndScreen() {
+    async function showEndScreen() {
         document.getElementById('quiz-screen').classList.add('hidden');
         document.getElementById('end-screen').classList.remove('hidden');
         document.getElementById('score-display').innerText = `${score} מתוך ${allQuestions.length}`;
         
-        // שמירת תוצאה בטבלה (Local Storage)
-        let highScores = JSON.parse(localStorage.getItem('nogaScores')) || [];
-        highScores.push({name: playerName, score: score});
-        highScores.sort((a, b) => b.score - a.score); // מיון מהגבוה לנמוך
-        localStorage.setItem('nogaScores', JSON.stringify(highScores));
-
-        displayLeaderboard();
+        // שליחה לענן
+        await sendScoreToCloud(playerName, score);
+        // טעינת הלוח המעודכן
+        fetchAndDisplayLeaderboard();
     }
 
-    function displayLeaderboard() {
+    async function sendScoreToCloud(name, finalScore) {
+        const body = {
+            noga: { // השם של הגיליון בטבלה
+                name: name,
+                score: finalScore
+            }
+        };
+        
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if(response.ok) {
+                document.getElementById('status-message').innerText = "התוצאה נשמרה בהצלחה!";
+            }
+        } catch (error) {
+            document.getElementById('status-message').innerText = "שגיאה בשמירה לענן.";
+        }
+    }
+
+    async function fetchAndDisplayLeaderboard() {
         const container = document.getElementById('leaderboard');
-        const highScores = JSON.parse(localStorage.getItem('nogaScores')) || [];
-        container.innerHTML = highScores.map(item => 
-            `<div class="leaderboard-item"><span>${item.name}</span><span>${item.score} נק'</span></div>`
-        ).join('');
+        try {
+            const response = await fetch(API_URL);
+            const data = await response.json();
+            let scores = data.noga || [];
+
+            // מיון מהציון הגבוה לנמוך
+            scores.sort((a, b) => b.score - a.score);
+
+            if(scores.length === 0) {
+                container.innerHTML = "אין עדיין תוצאות. תהיו הראשונים!";
+                return;
+            }
+
+            container.innerHTML = scores.map((item, index) => `
+                <div class="leaderboard-item">
+                    <span>${index + 1}. ${item.name}</span>
+                    <span style="font-weight:bold;">${item.score} נק'</span>
+                </div>
+            `).join('');
+        } catch (error) {
+            container.innerHTML = "לא הצלחנו לטעון את לוח התוצאות.";
+        }
     }
 </script>
 
